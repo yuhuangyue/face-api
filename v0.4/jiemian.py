@@ -4,7 +4,6 @@ import cv2
 from PIL import Image, ImageTk, ImageFont,ImageDraw
 from tkinter.ttk import Separator
 import numpy as np
-import threading
 import time
 import sys
 sys.path.append(r'E:\AFCtest\Face\Face_Recognition_Algorithm\人脸特征分析\minions_check_quality_v0.1.0\checkAPI\Minions\\')
@@ -12,9 +11,12 @@ from minions_api import detect
 
 from deepface import DeepFace
 import io
-import base64
+import dlib
+
 
 testIp = 'http://172.16.50.17:9000/'
+detector=dlib.get_frontal_face_detector()
+predictor=dlib.shape_predictor(r"E:\AFCtest\Face\Face_Recognition_Algorithm\model/shape_predictor_68_face_landmarks.dat")
 
 def image2byte(image):
     '''
@@ -70,13 +72,25 @@ def show_res (result):
     return detect_res, saved
 
 
+def video_feat_show(cv2image):
+    gray = cv2.cvtColor(cv2image, cv2.COLOR_BGR2GRAY)
+    rects = detector(gray, 0)
+    for i in range(len(rects)):
+        cv2.rectangle(cv2image, (rects[i].left(), rects[i].top()), (rects[i].right(), rects[i].bottom()),
+                      (0, 0, 255), 2)
+        landmarks = np.matrix([[p.x, p.y] for p in predictor(cv2image, rects[i]).parts()])
+        for idx, point in enumerate(landmarks):
+            pos = (point[0, 0], point[0, 1])
+            cv2.circle(cv2image, pos, 1, color=(0, 0, 255))
+
+    return cv2image
 
 
 
 def video_loop():
 
-
     global detect_res
+    global face_feat
 
     idx = 0
     video_cnt = 0
@@ -86,9 +100,12 @@ def video_loop():
     while camera.isOpened():
         success, img = camera.read()  # 从摄像头读取照片
         if success:
-            cv2image = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
-            cv2image = cv2.flip(cv2image, 1)  # 摄像头是和人对立的，将图像左右调换回来正常显示。
+            cv2image = cv2.flip(img, 1)  # 摄像头是和人对立的，将图像左右调换回来正常显示。
 
+            if face_feat :
+                cv2image = video_feat_show(cv2image)
+
+            cv2image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
             current_image = Image.fromarray(cv2image)  # 将图像转换成Image对象
             current_image = current_image.resize((400, 300),Image.NEAREST)
 
@@ -101,7 +118,7 @@ def video_loop():
             panel.update()
 
 
-            if video_cnt % 47 == 0:
+            if not face_feat and video_cnt % 47 == 0:
                 img_send = current_image.resize((200, 200), Image.NEAREST)
                 start = time.time()
                 demography = DeepFace.analyze(np.array(img_send)[:, :, 0:3], actions=['age', 'gender'],
@@ -113,7 +130,7 @@ def video_loop():
 
 
 
-            if video_cnt % 23 == 0:
+            if not face_feat and video_cnt % 23 == 0:
                 print ('send data ', video_cnt, idx)
 
                 img_send = current_image.resize((200, 200),Image.NEAREST)
@@ -150,15 +167,23 @@ def send():
             x = x +items[j] + "\n"
         select_str.set ('选择的结果是: \n'+x)
 
-    #print(x)
     select_type = x
+
+def face_feat_show():
+    global face_feat
+    print ('click this btn')
+
+    if featVar.get() == 1:
+        face_feat = True
+    else:
+        face_feat = False
 
 if __name__ == "__main__":
 
     select_type = ""
     max_len = 500
     detect_res = ''
-
+    face_feat = False
 
     models = {}
     models['age'] = DeepFace.build_model('Age')
@@ -182,9 +207,13 @@ if __name__ == "__main__":
     panel.grid(row=0, column=0, rowspan=9)
     root.config(cursor="arrow")
 
+    # 1.1 show detector
+    featVar = IntVar()
+    faceFeatBtn = Checkbutton(root, text='绘制人脸特征', variable=featVar, command=face_feat_show).grid(row=10, column=0)
 
     sep = Separator(root, orient='vertical')
     sep.grid(row=0, column=1, rowspan=9, ipady=200, padx=8, pady=8)
+
 
     # 2. select info
     label_top = Label(root, text="请选择检测的项目", bg="lightyellow", fg="red", width=20).grid(row=0 , column=2)
