@@ -74,15 +74,15 @@ def show_res (result):
 
 
 def video_loop():
-    global tasklist
-    global cur_saved_img
-    global saved_flag
-    global age_res
-    global gender_res
+
+
     global detect_res
 
     idx = 0
     video_cnt = 0
+    gender_res = ''
+    age_res = ''
+    show_idx = 0
     while camera.isOpened():
         success, img = camera.read()  # 从摄像头读取照片
         if success:
@@ -94,14 +94,12 @@ def video_loop():
 
             draw = ImageDraw.Draw(current_image)
             draw.text((10, 10), detect_res + str(gender_res) + str(age_res), font=ImageFont.truetype("./simsun.ttc",20), fill=(255, 255, 255))
-
+            draw.rectangle(((0, 0), (400, 300)), fill=None, outline='red', width=5)
             imgtk = ImageTk.PhotoImage(image=current_image)
             panel.imgtk = imgtk
             panel.config(image=imgtk)
             panel.update()
 
-
-            video_cnt = video_cnt + 1
 
             if video_cnt % 47 == 0:
                 img_send = current_image.resize((200, 200), Image.NEAREST)
@@ -113,11 +111,12 @@ def video_loop():
                 end = time.time()
                 print('deep face time ', end - start)
 
+
+
             if video_cnt % 23 == 0:
                 print ('send data ', video_cnt, idx)
 
                 img_send = current_image.resize((200, 200),Image.NEAREST)
-                #tasklist[idx] = current_image.resize((100, 100),Image.NEAREST)
 
                 start = time.time()
                 result = run_api(image2byte(img_send))
@@ -127,12 +126,15 @@ def video_loop():
                 print (detect_res)
 
                 if saved_flag:
-                    label_img.imgtk = imgtk
-                    label_img.config(image=imgtk)
-                    label_img.update()
+                    imgtk_resize = ImageTk.PhotoImage(image=current_image.resize((100, 70), Image.NEAREST))
+                    label_list[show_idx].imgtk = imgtk_resize
+                    label_list[show_idx].config(image=imgtk_resize)
+                    label_list[show_idx].update()
                     saved_flag = False
+                    show_idx = (show_idx+1)%4
 
                 idx = (idx+1)%max_len
+
 
             video_cnt = video_cnt + 1
 
@@ -154,13 +156,9 @@ def send():
 if __name__ == "__main__":
 
     select_type = ""
-    age_res = 0
-    gender_res = ''
     max_len = 500
-    saved_flag = False
-    cur_saved_img = None
     detect_res = ''
-    tasklist = [0] * max_len
+
 
     models = {}
     models['age'] = DeepFace.build_model('Age')
@@ -177,7 +175,7 @@ if __name__ == "__main__":
 
 
     root = Tk()
-    root.title("camera")
+    root.title("人脸质量筛查系统")
 
     # 1. camera
     panel = Label(root)  # initialize image panel
@@ -209,19 +207,18 @@ if __name__ == "__main__":
     sep2.grid(row=0 , column=3, rowspan=9 , ipady=200, padx=8, pady=8)
 
     # 3. show img
-    label_top = Label(root, text="以下照片未通过质量检查", bg="lightyellow", fg="red", width=60).grid(row=0 , column=4)
-    photo = PhotoImage(file='1.png')
-    label_img = Label(image=photo,  width=300, height=300)
-    label_img.image = photo
-    label_img.grid(row=0, column=4, columnspan=1, rowspan=9)
+    label_top = Label(root, text="以下照片未通过质量检查", bg="lightyellow", fg="red", width=30).grid(row=0 , column=4)
+    bg_img_path = '1.png'
 
-
+    label_list = [1] * 4
+    for i in range(4):
+        photo = PhotoImage(file=bg_img_path)
+        label_list[i] = Label(image=photo,  width=100, height=70)
+        label_list[i].image = photo
+        label_list[i].grid(row=i*2+1,rowspan=2, column=4)
 
     video_loop()
-
     root.mainloop()
-    tasklist=[-1]*max_len
-
 
     camera.release()
     cv2.destroyAllWindows()
