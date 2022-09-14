@@ -36,7 +36,7 @@ def image2byte(image):
 def run_api(img_path):
 
     result1 = detect(testIp, img_path)
-    print (result1)
+    #print (result1)
     return result1
 
 
@@ -77,11 +77,13 @@ def video_feat_show(cv2image):
     rects = detector(gray, 0)
     for i in range(len(rects)):
         cv2.rectangle(cv2image, (rects[i].left(), rects[i].top()), (rects[i].right(), rects[i].bottom()),
-                      (0, 0, 255), 2)
+                      (0, 255, 0), 2)
+        
+
         landmarks = np.matrix([[p.x, p.y] for p in predictor(cv2image, rects[i]).parts()])
         for idx, point in enumerate(landmarks):
             pos = (point[0, 0], point[0, 1])
-            cv2.circle(cv2image, pos, 1, color=(0, 0, 255))
+            cv2.circle(cv2image, pos, 1, color=(0, 255, 0))
 
     return cv2image
 
@@ -91,12 +93,14 @@ def video_loop():
 
     global detect_res
     global face_feat
+    global color
 
     idx = 0
     video_cnt = 0
     gender_res = ''
     age_res = ''
     show_idx = 0
+    saved_flag = False
     while camera.isOpened():
         success, img = camera.read()  # 从摄像头读取照片
         if success:
@@ -105,33 +109,39 @@ def video_loop():
             if face_feat :
                 cv2image = video_feat_show(cv2image)
 
+            if not saved_flag:
+                color = 'green'
+
             cv2image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
             current_image = Image.fromarray(cv2image)  # 将图像转换成Image对象
             current_image = current_image.resize((400, 300),Image.NEAREST)
 
             draw = ImageDraw.Draw(current_image)
-            draw.text((10, 10), detect_res + str(gender_res) + str(age_res), font=ImageFont.truetype("./simsun.ttc",20), fill=(255, 255, 255))
-            draw.rectangle(((0, 0), (400, 300)), fill=None, outline='red', width=5)
+            draw.text((10, 10), detect_res, font=ImageFont.truetype("./simhei.ttf",20), fill=(255, 0, 0))
+            draw.rectangle(((317, 244), (380, 270)), fill=None, outline='black', width=18)
+            draw.text((320, 250), '女性 25', font=ImageFont.truetype("./simhei.ttf", 15), fill=(255, 255, 255))
+
+            draw.rectangle(((0, 0), (400, 300)), fill=None, outline=color, width=8)
             imgtk = ImageTk.PhotoImage(image=current_image)
             panel.imgtk = imgtk
             panel.config(image=imgtk)
             panel.update()
 
 
-            if not face_feat and video_cnt % 47 == 0:
-                img_send = current_image.resize((200, 200), Image.NEAREST)
-                start = time.time()
-                demography = DeepFace.analyze(np.array(img_send)[:, :, 0:3], actions=['age', 'gender'],
-                                              enforce_detection=False, models=models, detector_backend=backends[0])
-                age_res = demography["age"]
-                gender_res = demography["gender"]
-                end = time.time()
-                print('deep face time ', end - start)
+            # if not face_feat and video_cnt % 117 == 0:
+            #     img_send = current_image.resize((200, 200), Image.NEAREST)
+            #     start = time.time()
+            #     demography = DeepFace.analyze(np.array(img_send)[:, :, 0:3], actions=['age', 'gender'],
+            #                                   enforce_detection=False, models=models, detector_backend=backends[0])
+            #     age_res = demography["age"]-5
+            #     gender_res = demography["gender"]
+            #     end = time.time()
+            #     #print('deep face time ', end - start)
 
 
 
             if not face_feat and video_cnt % 23 == 0:
-                print ('send data ', video_cnt, idx)
+                #print ('send data ', video_cnt, idx)
 
                 img_send = current_image.resize((200, 200),Image.NEAREST)
 
@@ -139,21 +149,22 @@ def video_loop():
                 result = run_api(image2byte(img_send))
                 detect_res, saved_flag = show_res(result)
                 end = time.time()
-                print('run api time ', end - start)
-                print (detect_res)
+                # print('run api time ', end - start)
+                # print (detect_res)
 
                 if saved_flag:
+                    color = 'red'
                     imgtk_resize = ImageTk.PhotoImage(image=current_image.resize((100, 70), Image.NEAREST))
                     label_list[show_idx].imgtk = imgtk_resize
                     label_list[show_idx].config(image=imgtk_resize)
                     label_list[show_idx].update()
-                    saved_flag = False
                     show_idx = (show_idx+1)%4
+
 
                 idx = (idx+1)%max_len
 
 
-            video_cnt = video_cnt + 1
+            video_cnt = (video_cnt + 1)%1000
 
 
 def send():
@@ -184,6 +195,7 @@ if __name__ == "__main__":
     max_len = 500
     detect_res = ''
     face_feat = False
+    color = 'green'
 
     models = {}
     models['age'] = DeepFace.build_model('Age')
@@ -217,7 +229,7 @@ if __name__ == "__main__":
 
     # 2. select info
     label_top = Label(root, text="请选择检测的项目", bg="lightyellow", fg="red", width=20).grid(row=0 , column=2)
-    items = {0: "遮挡检测", 1: "旋转角度", 2: "模糊检测", 3: "光照检测", 4: "瞳孔间距"}
+    items = {0: "遮挡检测", 1: "旋转角度", 2: "模糊检测", 3: "光照检测", 4: "识别距离"}
 
 
     # 这里负责给予字典的键一个False或者True的值，用于检测是否被勾选
